@@ -1,21 +1,3 @@
-/*import org.apache.spark.sql.{SparkSession,DataFrame}
-import org.apache.spark.SparkConf
-
-object Main extends App {
-  val conf: SparkConf = new SparkConf()
-  conf.set("spark.driver.memory","1G")
-    .set("spark.testing.memory","2147480000")
-
-  val sparkSession = SparkSession
-    .builder
-    .master("local[1]")
-    .config(conf)
-    .enableHiveSupport()
-    .getOrCreate()
-
-  print(sparkSession.sql("SELECT 'A'").show())
-}*/
-
 package fr.mosef.scala.template
 
 import fr.mosef.scala.template.job.Job
@@ -23,15 +5,16 @@ import fr.mosef.scala.template.processor.Processor
 import fr.mosef.scala.template.processor.impl.ProcessorImpl
 import fr.mosef.scala.template.reader.Reader
 import fr.mosef.scala.template.reader.impl.ReaderImpl
+import fr.mosef.scala.template.writer.WriterImpl
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import fr.mosef.scala.template.writer.Writer
 import org.apache.spark.SparkConf
 import com.globalmentor.apache.hadoop.fs.BareLocalFileSystem
 import org.apache.hadoop.fs.FileSystem
 import org.apache.spark.sql.{SparkSession, SaveMode}
-import fr.mosef.scala.template.writer.WriterImpl
 
 object Main extends App with Job {
+
   val cliArgs = args
   val MASTER_URL: String = try {
     cliArgs(0)
@@ -59,7 +42,6 @@ object Main extends App with Job {
       "./default/output-writer"
     }
   }
-
   val conf: SparkConf = new SparkConf()
   conf.set("spark.testing.memory", "471859200")
 
@@ -71,6 +53,33 @@ object Main extends App with Job {
     .getOrCreate()
 
   sparkSession.sparkContext.hadoopConfiguration.setClass("fs.file.impl",  classOf[ BareLocalFileSystem], classOf[FileSystem])
+
+  val reader: Reader = new ReaderImpl(sparkSession)
+  val processor: Processor = new ProcessorImpl()
+  val writerPropertiesFile = "../src/main/ressources/application.properties"
+  val writer: Writer = new WriterImpl(writerPropertiesFile)
+  val src_path = SRC_PATH
+  val dst_path = DST_PATH
+
+
+
+  val inputDF = if (src_path.endsWith(".csv")) {
+    reader.read(src_path,SEPA)
+  } else if (src_path.endsWith(".parquet")) {
+    reader.read("parquet", Map.empty, src_path)
+  } else {
+    throw new IllegalArgumentException("Unsupported file format")
+  }
+  val processedDF = processor.process(inputDF)
+
+  // Utilisation de write ou writeParquet en fonction du format du fichier source
+  if (src_path.endsWith(".csv")) {
+    writer.write(processedDF, "overwrite", dst_path)
+  } else if (src_path.endsWith(".parquet")) {
+    writer.writeParquet(processedDF, "overwrite",dst_path)
+    }
+}
+
 /*
   val spark = SparkSession.builder()
     .appName("TableHive")
@@ -91,7 +100,7 @@ object Main extends App with Job {
   val df = data.toDF("iddugars", "nomdugars", "salairedumec")
 
   // Stockage des données dans un répertoire local
-  val localPath = "./src/main/ressources/table_data"
+  val localPath = "./src/main/ressources/"
   df.write.mode(SaveMode.Overwrite).csv(localPath)
 
   // Création de la table Hive
@@ -100,7 +109,7 @@ object Main extends App with Job {
 
   // Affichage du schéma de la table Hive
   println(spark.sql(s"DESCRIBE $tableName").show())
-*/
+
   val reader: Reader = new ReaderImpl(sparkSession)
   val processor: Processor = new ProcessorImpl()
   val writer: Writer = new WriterImpl()
@@ -122,4 +131,4 @@ object Main extends App with Job {
   } else if (src_path.endsWith(".parquet")) {
     writer.writeParquet(processedDF, "overwrite",dst_path)
     }
-}
+}*/
